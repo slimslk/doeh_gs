@@ -64,6 +64,9 @@ class Player:
         self.world = world
         await self.notify_observers()
 
+    async def is_solid(self):
+        return self.__is_solid
+
     # =========== Action methods =============== #
 
     async def increase_hungry(self, amount: int):

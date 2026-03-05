@@ -1,10 +1,10 @@
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 from db.db import db_helper
-from models.models import Character
+from models.models import Character, CharStats, GameObject
 from game.player import Player
-from utils.mapper import player_to_player_model, player_stats_to_stats_model
+from utils.mapper import player_to_player_model, player_stats_to_stats_model, inventory_to_model
 
 
 class CharacterRepository:
@@ -14,24 +14,31 @@ class CharacterRepository:
     async def create(self, player: Player) -> Character | None:
 
         stats = player_stats_to_stats_model(player)
+        game_object_models = inventory_to_model(player.inventory)
         character = player_to_player_model(player)
         print(f"character: {character}, stats: {stats}")
+
         async for session in db_helper.session_getter():
             try:
+                session.add(character)
+                await session.flush()
+
+                print(f"created character: {character}")
+                stats.char_id = character.id
                 session.add(stats)
                 await session.flush()
 
-                character.stats_id = stats.id
-                session.add(character)
+                for game_object in game_object_models:
+                    game_object.char_stats_id = stats.id
+                session.add_all(game_object_models)
+                await session.flush()
+
                 await session.commit()
-                await session.refresh(character)
-                # player.character_id = character.id
-                print(f"created character: {character}")
                 return character
-            except Exception as e:
-                session.rollback()
+            except SQLAlchemyError as e:
+                await session.rollback()
                 print(e)
-                return None
+                raise
 
     async def list_all_by_user_id(self, user_id: str) -> list[Character]:
         async for session in db_helper.session_getter():
@@ -47,7 +54,10 @@ class CharacterRepository:
                     Character.user_id == user_id,
                     Character.name == char_name,
                 )
-                .options(selectinload(Character.stats))
+                .options(
+                    selectinload(Character.stats)
+                    .selectinload(CharStats.inventory)
+                )
             )
             result = await session.execute(stm)
             return result.scalar_one_or_none()
@@ -62,14 +72,27 @@ class CharacterRepository:
     async def update_stats(self, player: Player) -> Character | None:
         async for session in db_helper.session_getter():
             try:
+                game_object_models = inventory_to_model(player.inventory)
+
                 result = await session.execute(
                     select(Character)
                     .where(Character.name == player.name)
                     .options(selectinload(Character.stats))
                 )
                 character: Character = result.scalar_one_or_none()
+                print(f"character: {character}")
                 if not character:
                     return None
+
+                await session.execute(delete(GameObject).where(
+                    GameObject.char_stats_id == character.stats.id
+                )
+                )
+
+                for game_object in game_object_models:
+                    game_object.char_stats_id = character.stats.id
+                session.add_all(game_object_models)
+                await session.flush()
 
                 self._update_stats(character, player)
 
@@ -77,7 +100,9 @@ class CharacterRepository:
                 await session.refresh(character)
                 return character
             except SQLAlchemyError as e:
-                session.rollback()
+                await session.rollback()
+                print(e)
+                raise
 
     def _update_stats(self, character: Character, player: Player) -> Character:
         stats = character.stats
@@ -86,7 +111,6 @@ class CharacterRepository:
         stats.hungry = player.hungry
         stats.position_x = player.pos_x
         stats.position_y = player.pos_y
-        stats.inventory = player.inventory
         stats.location_id = player.world.map_id
         stats.attack_modifier = player.attack_modifier
         stats.attack_damage = player.attack_damage
@@ -100,7 +124,7 @@ class CharacterRepository:
                 result = await session.execute(
                     select(Character)
                     .where(Character.user_id == username,
-                        Character.name == char_name,
+                           Character.name == char_name,
                            )
                     .options(selectinload(Character.stats))
                 )
@@ -113,4 +137,4 @@ class CharacterRepository:
                 await session.commit()
                 return True
             except SQLAlchemyError as e:
-                session.rollback()
+                await session.rollback()

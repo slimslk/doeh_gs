@@ -29,12 +29,12 @@ class ListItemsActionDTO(BaseActionDto):
 
 class UseItemActionDTO(BaseActionDto):
     action: Literal["use_item"]
-    params_value: int = Field(ge=0, default=1)
+    params_value: int = Field(ge=0, default=0)
 
 
 class AttackActionDTO(BaseActionDto):
     action: Literal["attack"]
-    params_value: Direction
+    params_value: Direction | None
     params_required: ClassVar[bool] = False
 
 

@@ -7,5 +7,5 @@ class SleepPotion(DefaultObject):
         self.set_collectable(True)
         self.set_consumable(True)
         self.action = {"action": "sleep", "params": []}
-        self.name = "red potion"
+        self.name = "purple potion"
         self.hp = 5

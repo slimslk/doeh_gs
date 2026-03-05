@@ -3,16 +3,16 @@ import uuid
 
 class DefaultObject:
     def __init__(self):
-        self.pos_x = 0
-        self.pos_y = 0
-        self.id = uuid.uuid4()
-        self.name = "void"
+        self.pos_x: int = 0
+        self.pos_y: int = 0
+        self.id: int = 0
+        self.name: str = "void"
         self.__is_solid: bool = False
         self.__is_collectable: bool = False
         self.__is_consumable: bool = False
         self.action: dict[str, object] = {"action": "do_nothing", "params": 0}
-        self.hp = -999
-        self.world_map = None
+        self.hp: int = -999
+        # self.world_map = None
 
     def get_world_map(self):
         return self.world_map

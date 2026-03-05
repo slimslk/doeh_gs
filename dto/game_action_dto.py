@@ -17,7 +17,7 @@ class GetPlayerActionDTO(BaseActionDto):
 
 class GetFullMapActionDTO(BaseActionDto):
     action: Literal["get_full_map"]
-    params_value: str = Field(min_length=1)
+    params_value: str | None = Field(min_length=1)
     params_required: ClassVar[bool] = False
 
 

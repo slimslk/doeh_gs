@@ -1,12 +1,12 @@
 import threading
 import random
 
-from errors.errors import LocationNotFoundError
 from game.location import Location
 from game.game_observer import GameObjectObserver
 from game.player import Player
 from game.player_controller import PlayerController
 from game.location_generator import generate_main_location
+
 
 
 class Main:
@@ -26,7 +26,8 @@ class Main:
     def __init__(self):
         if not self._initialized:
             self.locations: dict[str, Location] = {}
-            self.player_controllers: dict[str, PlayerController] = {}
+            self.users_player_controllers: dict[str, PlayerController] = {}
+            self.character_player_controllers: dict[str, PlayerController] = {}
             self.main_location: Location | None = None
             self.users: {str: bool} = {}
             self.observers: dict[str, set] = {}
@@ -72,6 +73,7 @@ class Main:
     async def create_player(self, name, user_id) -> Player:
         max_height, max_width = self.main_location.get_location_size()
         player = self.__create_default_player(name, user_id)
+        player.world = self.main_location.get_map()
 
         player_coordinates = (random.randint(0, max_width - 1), random.randint(0, max_height - 1))
 
@@ -143,15 +145,24 @@ class Main:
 
     async def create_player_controller(self, player: Player) -> PlayerController:
         player_controller = PlayerController(player)
-        self.player_controllers[player.user_id] = player_controller
+        self.users_player_controllers[player.user_id] = player_controller
         return player_controller
 
     def remove_user(self, user_id: str):
         self.users.pop(user_id, None)
-        # self.player_controllers.pop(user_id, None)
+        player_controller = self.users_player_controllers.pop(user_id, None)
+        self.character_player_controllers[player_controller.get_player().name] = player_controller
 
-    async def get_player_controller(self, user_id: str) -> PlayerController | None:
-        return await self.__check_if_player_exists(user_id)
+    async def assign_character_to_user(self, user_id: str, char_name: str):
+        player_controller = self.character_player_controllers.pop(char_name, None)
+        if player_controller:
+            self.users_player_controllers[user_id] = player_controller
+
+    async def get_player_controller_by_user_id(self, user_id: str) -> PlayerController | None:
+        return await self.__get_player_controller_by_user_id(user_id)
+
+    async def get_player_controller_by_char_name(self, char_name: str) -> PlayerController | None:
+        return await self.__get_player_controller_by_char_name(char_name)
 
     async def add_player_to_location(self, player, pos_x, pos_y, location_id):
         location = self.__check_if_location_exists(location_id)
@@ -182,6 +193,9 @@ class Main:
             # raise LocationNotFoundError(location_id)
         return location
 
-    async def __check_if_player_exists(self, user_id: str) -> PlayerController | None:
-        player_controller = self.player_controllers.get(user_id, None)
-        return player_controller
+    async def __get_player_controller_by_char_name(self, char_name: str) -> PlayerController | None:
+        return self.character_player_controllers.get(char_name, None)
+
+    async def __get_player_controller_by_user_id(self, user_id: str) -> PlayerController | None:
+        return self.users_player_controllers.get(user_id, None)
+

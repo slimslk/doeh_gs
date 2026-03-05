@@ -62,7 +62,6 @@ class KafkaGameManager(GameManager):
         self._game.remove_map_observer(observer)
 
     async def process_event(self, user_id, data: Any):
-        print("IN event")
         if not self._game.check_is_user_present(user_id):
             self._game.add_user(user_id)
         if self._game.users[user_id]:
@@ -94,7 +93,7 @@ class KafkaGameManager(GameManager):
 
     async def __process_player_death(self, player: Player):
         self._game.remove_user(player.user_id)
-        self._game.player_controllers.pop(player.user_id, None)
+        self._game.users_player_controllers.pop(player.user_id, None)
         await player.notify_observers()
         await self.__update_payer_data(player)
 
@@ -113,9 +112,16 @@ class KafkaGameManager(GameManager):
         })
 
     async def __get_player(self, user_id, char_name: str) -> Player | None:
-        player_controller = await self._game.get_player_controller(user_id)
+        player_controller = await self._game.get_player_controller_by_user_id(user_id)
         if player_controller:
             return player_controller.get_player()
+
+        player_controller = await self._game.get_player_controller_by_char_name(char_name)
+        if player_controller:
+            if player_controller.get_player().user_id == user_id:
+                await self._game.assign_character_to_user(user_id, char_name)
+                return player_controller.get_player()
+            return None
         try:
             char = await self._char_repository.get_by_user_id_and_character_name(user_id, char_name)
             if not char:
@@ -133,7 +139,7 @@ class KafkaGameManager(GameManager):
             character = await self._char_repository.create(player)
         except SQLAlchemyError as err:
             self.logger.error(f"Creating char: {player.name} of user: {user_id} is fail", exc_info=err)
-            # await self._game.remove_player_from_location(player, player.world.map_id)
+            await self._game.remove_player_from_location(player, player.world.map_id)
             return None
         if not player:
             return
@@ -143,7 +149,7 @@ class KafkaGameManager(GameManager):
         return player
 
     async def __apply_event_to_player(self, user_id, action_dto: BaseActionDto):
-        player_controller = await self._game.get_player_controller(user_id)
+        player_controller = await self._game.get_player_controller_by_user_id(user_id)
         if player_controller is None:
             return
         if player_controller.get_player().is_dead:
@@ -154,7 +160,8 @@ class KafkaGameManager(GameManager):
         if method is None or not callable(method):
             raise IncorrectActionValues()
         if inspect.iscoroutinefunction(method):
-            if action_dto.params_value:
+            print(f"param_values: {action_dto.params_value}")
+            if action_dto.params_value is not None:
                 result = await method(action_dto.params_value)
             else:
                 result = await method()
@@ -175,7 +182,7 @@ class KafkaGameManager(GameManager):
 
         match action_dto.action:
             case "logout":
-                player_controller: PlayerController = await self._game.get_player_controller(user_id)
+                player_controller: PlayerController = await self._game.get_player_controller_by_user_id(user_id)
                 if player_controller is None:
                     self.logger.info(f"Character not found")
                     return None
@@ -183,6 +190,7 @@ class KafkaGameManager(GameManager):
                 if player:
                     try:
                         self._game.remove_user(user_id)
+                        print(f"Update player stats")
                         await self._char_repository.update_stats(player)
                         return
                     except SQLAlchemyError as err:

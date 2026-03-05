@@ -1,7 +1,5 @@
 from pydantic import BaseModel
 
-# from config.settings import KafkaSettings, Settings
-
 
 def build_from_settings(*, base,
                         settings,
