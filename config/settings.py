@@ -1,5 +1,7 @@
+import logging
 import os
 import ssl
+from logging.handlers import RotatingFileHandler
 from typing import Any
 
 from aiokafka.helpers import create_ssl_context
@@ -11,6 +13,19 @@ from pydantic_settings import (
     SettingsConfigDict
 )
 from utils.helper import build_from_settings
+
+log_handler = RotatingFileHandler(
+    'logs/app.logs',
+    maxBytes=5 * 1024 * 1024,
+    backupCount=3
+)
+
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+log_handler.setFormatter(formatter)
+
+logger = logging.getLogger("app")
+logger.setLevel(logging.INFO)
+logger.addHandler(log_handler)
 
 
 class PlayerSettings(BaseModel):

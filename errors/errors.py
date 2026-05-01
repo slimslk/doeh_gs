@@ -38,6 +38,11 @@ class LocationNotFoundError(DefaultError):
         super().__init__(f'Location not found: {location_id}')
 
 
+class GameObjectNotFoundError(DefaultError):
+    def __init__(self, object_name):
+        super().__init__(f'Object not found: {object_name}')
+
+
 class PlayerNotFoundError(DefaultError):
     def __init__(self, user_id):
         super().__init__(f'Player not found: {user_id}')

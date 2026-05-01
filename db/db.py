@@ -19,8 +19,6 @@ class DBHelper:
             max_overflow: int = 10,
             current_schema: str = "public",
     ) -> None:
-
-        print(f"MER: {type(current_schema)}")
         self.engine = create_async_engine(url,
                                           echo=echo,
                                           echo_pool=echo_pool,

@@ -7,3 +7,6 @@ class Corpse(DefaultObject):
         self.name = "corpse"
         self.hp = 40
         self.corpse_name = "default"
+
+    def get_message(self):
+        return f"{super().get_message()} - {self.corpse_name}"

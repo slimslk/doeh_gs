@@ -2,7 +2,10 @@ import inspect
 import random
 
 from errors.action_errors import IncorrectActionValues
+from actions.interaction_system import DefaultInteractionSystem
+from game.item.consumable.consumable_obj import DefaultConsumableObject
 from game.item.corpse import Corpse
+from game.item.sword import Weapon
 from game.map import Map
 from game.item.def_object import DefaultObject
 from game.game_observer import GameObjectObserver
@@ -18,8 +21,15 @@ class Player:
     __MAX_HUNGRY = settings.player.max_hungry / __GAME_TICK
     __is_solid: bool = True
     char_id: int = -1
+    HUNGER_STATES = [
+        (0, "I'm dying!"),
+        (0.10, "I'm starving! I need food immediately!"),
+        (0.25, "I'm very hungry… I need food soon."),
+        (0.50, "I'm quite hungry now."),
+        (0.80, "I'm starting to feel hungry."),
+    ]
 
-    def __init__(self, user_id, name):
+    def __init__(self, user_id, name, interact_system: DefaultInteractionSystem):
         self.user_id = user_id
         self.name = name
         self.pos_x = 0
@@ -37,6 +47,14 @@ class Player:
         self.skip_counter = 0
         self.observers: set[GameObjectObserver] = set()
         self.is_sleep: bool = False
+        self.interact_system = interact_system
+
+        self.is_active = True
+        self.equipped_weapon = None
+        self.equipped_defence = None
+
+        self.message = []
+        self.hunger_state = 1
 
     def add_observer(self, observer: GameObjectObserver):
         self.observers.add(observer)
@@ -75,7 +93,9 @@ class Player:
         if self.hungry < 0:
             self.hungry = 0
             await self.decrease_health(5)
-        if self.hungry % 100 == 0:
+        message = self.__get_hunger_state(hunger=self.hungry, max_hunger=self.__MAX_HUNGRY)
+        if self.message:
+            self.message.append(message)
             await self.notify_observers()
 
     async def decrease_hungry(self, amount: int):
@@ -84,6 +104,14 @@ class Player:
         if self.hungry > self.__MAX_HUNGRY:
             self.hungry = self.__MAX_HUNGRY
         await self.notify_observers()
+
+    def __get_hunger_state(self, hunger, max_hunger):
+        hunger_in_percent = hunger / max_hunger
+        for threshold, state in self.HUNGER_STATES:
+            if hunger_in_percent <= threshold:
+                if self.hunger_state != state:
+                    return state
+                return None
 
     async def decrease_energy(self, amount: int):
         amount = int(amount)
@@ -129,7 +157,6 @@ class Player:
     Diagonals: (1, 1), (1, -1) , (-1, 1), (-1, -1)"""
 
     async def move(self, direction: tuple[int, int], steps: int):
-        print(steps, "STEPS")
         steps = int(steps)
         if self.energy <= 0:
             return
@@ -161,7 +188,13 @@ class Player:
             await self.notify_observers()
             await self.world.move_player(self, old_pos_x, old_pos_y, self.pos_x, self.pos_y)
 
-    async def take_object(self, direction: tuple[int, int] = None):
+    async def __take_object(self, item, x, y):
+        await item.get_world_map().remove_first_object(x, y)
+        item.set_position(-1, -1)
+        self.inventory.append(item)
+        await self.notify_observers()
+
+    async def interact(self, direction: tuple[int, int] = None):
         await self.decrease_energy(1)
         if direction:
             x = self.pos_x + direction[0]
@@ -170,11 +203,11 @@ class Player:
             x = self.pos_x + self.direction[0]
             y = self.pos_y + self.direction[1]
         item = self.world.get_first_object(x, y)
-        if item.is_collectable():
-            await item.get_world_map().remove_first_object(x, y)
-            item.set_position(-1, -1)
-            self.inventory.append(item)
-            await self.notify_observers()
+        if isinstance(item, DefaultObject):
+            if item.is_collectable():
+                await self.__take_object(item, x, y)
+            else:
+                await self.interact_system.interact(self, item, item.action)
 
     def show_list_of_items(self, amount: int = -1):
         if not len(self.inventory):
@@ -190,10 +223,10 @@ class Player:
         else:
             await self.decrease_energy(1)
             item = self.inventory[index]
-            action = item.use()
-            if item.is_consumable():
+            await self.interact_system.interact(self, item, item.action)
+            if isinstance(item, DefaultConsumableObject):
+                self.message.append(item.get_consume_message())
                 self.inventory.pop(index)
-            await self.do_action(action)
         await self.notify_observers()
 
     async def attack(self, direction: tuple[int, int] = None):
@@ -225,6 +258,29 @@ class Player:
 
     async def do_nothing(self):
         await self.skip_turn()
+
+    async def equip_weapon(self, weapon: Weapon, params: tuple[int, int]):
+        if self.equipped_weapon:
+            await self.equipped_weapon.use(actor=self)
+            await self.take_off_weapon(weapon=None, params=None)
+        self.attack_modifier = params[0]
+        self.attack_damage = params[1]
+        self.equipped_weapon = weapon
+
+    async def take_off_weapon(self, weapon, params):
+        self.attack_modifier = settings.player.default_attack_modifier
+        self.attack_damage = settings.player.default_attack_damage
+        self.equipped_weapon = None
+
+    async def equip_defence(self, defence: int):
+        if self.equipped_defence:
+            await self.equipped_defence.use()
+            await self.take_off_defence(params=None)
+        self.defence = defence
+
+    async def take_off_defence(self, params):
+        self.defence = None
+        self.defence = settings.player.default_defence
 
     async def sleep(self):
         self.is_sleep = True
@@ -271,13 +327,13 @@ class Player:
             "attack_damage": self.attack_damage,
             "defence": self.defence,
             "is_dead": self.is_dead,
-            "is_sleep": self.is_sleep
+            "is_sleep": self.is_sleep,
         }
 
     async def process_death(self):
         corpse = Corpse()
         corpse.corpse_name = self.name
-        await self.world.replace_object(corpse, self.pos_x, self.pos_y)
+        await self.world.replace_object(corpse, self.pos_x, self.pos_y, position=-1)
         self.is_dead = True
         for item in self.inventory:
             x = self.pos_x
@@ -285,7 +341,7 @@ class Player:
             while (x == self.pos_x and y == self.pos_y) or self.world.location_map[x][y][0].is_solid():
                 x = self.pos_x + random.randint(0, 1)
                 y = self.pos_y + random.randint(0, 1)
-            await self.world.place_object(item, x, y)
+            await self.world.place_game_object(item, x, y)
         self.inventory = []
 
     def __check_is_player_dead(self) -> bool:
@@ -295,6 +351,7 @@ class Player:
         return f"Player: {self.name}"
 
     async def notify_observers(self):
-        data = {self.user_id: self.get_player_parameters()}
-        for observer in self.observers:
-            await observer.update(data)
+        if self.is_active:
+            data = {self.user_id: self.get_player_parameters()}
+            for observer in self.observers:
+                await observer.update(data)

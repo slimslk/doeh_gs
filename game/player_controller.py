@@ -9,39 +9,44 @@ class PlayerController:
     def get_player(self):
         return self.__player
 
-    async def move_up(self, steps: int = 1):
-        print(steps, "steps")
-        action = {"action": "move", "params": [(-1, 0), steps]}
+    async def move(self, params: tuple[tuple[int, int], int]):
+        action = {"action": "move", "params": params}
         await self.__do_action(action)
+
+    async def move_up(self, steps: int = 1):
+        await self.move(((-1, 0), steps))
 
     async def move_down(self, steps: int = 1):
-        action = {"action": "move", "params": [(1, 0), steps]}
-        await self.__do_action(action)
+        await self.move(((1, 0), steps))
 
     async def move_left(self, steps: int = 1):
-        action = {"action": "move", "params": [(0, -1), steps]}
-        await self.__do_action(action)
+        await self.move(((0, -1), steps))
 
     async def move_right(self, steps: int = 1):
-        action = {"action": "move", "params": [(0, 1), steps]}
-        await self.__do_action(action)
+        await self.move(((0, 1), steps))
 
-    async def take_item(self,
-                        direction: tuple[int, int] | None = None):
-        action = {"action": "take_object", "params": [direction]}
+    async def interact(self,
+                       direction: tuple[int, int] | None = None):
+        if direction is None:
+            direction = []
+        action = {"action": "interact", "params": direction}
         await self.__do_action(action)
 
     async def list_items(self, amount: int | None = None):
-        action = {"action": "show_list_of_items", "params": [amount]}
+        if amount is None:
+            amount = []
+        action = {"action": "show_list_of_items", "params": amount}
         await self.__do_action(action)
 
     async def use_item(self, index: int):
-        action = {"action": "use_item", "params": [index]}
+        action = {"action": "use_item", "params": index}
         await self.__do_action(action)
 
     async def attack(self,
                      direction: tuple[int, int] | None = None):
-        action = {"action": "attack", "params": [direction]}
+        if direction is None:
+            direction = []
+        action = {"action": "attack", "params": direction}
         await self.__do_action(action)
 
     async def skip_turn(self):

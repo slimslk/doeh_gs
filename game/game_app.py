@@ -1,12 +1,16 @@
 import threading
 import random
 
+from context import GameContext
+from errors.errors import GameObjectNotFoundError
+from game.item.def_object import DefaultObject
 from game.location import Location
 from game.game_observer import GameObjectObserver
+from game.map import Map
 from game.player import Player
 from game.player_controller import PlayerController
 from game.location_generator import generate_main_location
-
+from game.item_constants import game_objects_list, GameObjectEnum
 
 
 class Main:
@@ -25,14 +29,23 @@ class Main:
 
     def __init__(self):
         if not self._initialized:
-            self.locations: dict[str, Location] = {}
+            self._context: GameContext | None = None
+            self.locations: dict[str, Location] = {}  # key - map_id
             self.users_player_controllers: dict[str, PlayerController] = {}
             self.character_player_controllers: dict[str, PlayerController] = {}
             self.main_location: Location | None = None
-            self.users: {str: bool} = {}
+            self.users: dict[str: bool] = {}
             self.observers: dict[str, set] = {}
 
             Main._initialized = True
+
+    @property
+    def context(self) -> GameContext:
+        return self._context
+
+    @context.setter
+    def context(self, context: GameContext):
+        self._context = context
 
     def add_user(self, user_id: str):
         self.users[user_id] = False
@@ -54,20 +67,43 @@ class Main:
         return user_id in self.users
 
     async def generate_main_location(self) -> Location:
-        main_location = await generate_main_location()
+        main_location = await generate_main_location(context=self.context)
         for observer in self.observers.get(self._MAP_OBSERVER_NAME):
             main_location.get_map().add_observer(observer)
         self.add_location(main_location)
         self.main_location = main_location
         return self.main_location
 
+    async def add_object_to_game_map(self, obj, map_id, pos_x, pos_y):
+        location = self.get_location(map_id)
+        if isinstance(obj, GameObjectEnum):
+            game_object = game_objects_list.get(obj, None)
+            if game_object:
+                obj = game_object()
+        if obj:
+            obj.interact_system = self.context.interaction_system
+            await location.add_object_to_world(obj, pos_x, pos_y)
+        else:
+            raise GameObjectNotFoundError(obj)
+
+    async def replace_top_object(self, obj, map_id, pos_x, pos_y):
+        location = self.get_location(map_id)
+        if isinstance(obj, DefaultObject):
+            obj.interact_system = self.context.interaction_system
+            await location.replace_top_object(obj, pos_x, pos_y)
+
+    async def remove_object_from_game_map(self, game_object, game_map: Map, pos_x, pos_y):
+        location = self.get_location(game_map.map_id)
+        if location:
+            await location.remove_object_from_world(game_object, pos_x, pos_y)
+
     def get_locations(self):
         return [location for location in self.locations.keys()]
 
-    def get_location(self, location_id):
-        return self.locations.get(location_id, self.main_location)
+    def get_location(self, map_id):
+        return self.locations.get(map_id, self.main_location)
 
-    def add_location(self, location):
+    def add_location(self, location):  # TODO Nur hier benutz man dieses Funktion
         self.locations[location.get_map().map_id] = location
 
     async def create_player(self, name, user_id) -> Player:
@@ -81,11 +117,6 @@ class Main:
             player_coordinates = self.__find_free_spot(*player_coordinates, location=self.main_location)
         player.pos_x = player_coordinates[0]
         player.pos_y = player_coordinates[1]
-        # if player_coordinates:
-        #     await self.add_player_to_location(player, *player_coordinates,
-        #                                       location_id=self.main_location.get_map().map_id)
-
-        # await player.notify_observers()
         return player
 
     async def return_character_to_game(self, player: Player, location_id) -> Player:
@@ -105,15 +136,16 @@ class Main:
                 if location.get_map().get_first_object(*position).is_solid():
                     position = self.__find_free_spot(*position, location=location)
                 await self.add_player_to_location(player, *position,
-                                                  location_id=self.get_location(player.world.map_id))
+                                                  map_id=self.get_location(player.world.map_id))
             player_on_map = player
         await self.create_player_controller(player_on_map)
         return player_on_map
 
-    def __find_free_spot(self, start_pos_x: int, start_pos_y: int, location: Location) -> tuple[int, int]:
-        max_x, max_y = location.get_location_size()
-        max_radius = max(max_x, max_y)
-        for radius in range(1, max_radius + 1):
+    def __find_free_spot(self, start_pos_x: int, start_pos_y: int, location: Location, min_radius=-1) -> tuple[int, int]:
+        if min_radius == -1:
+            max_x, max_y = location.get_location_size()
+            min_radius = min(max_x, max_y)
+        for radius in range(1, min_radius + 1):
 
             for dx in range(-radius, radius + 1):
                 for dy in (-radius, radius):
@@ -136,7 +168,7 @@ class Main:
         raise RuntimeError("No free position found on the map")
 
     def __create_default_player(self, name: str, user_id: str) -> Player:
-        player = Player(user_id, name)
+        player = Player(user_id, name, self.context.interaction_system)
         observers = self.observers.get(self._PLAYER_OBSERVER_NAME, None)
         if observers:
             for observer in observers:
@@ -151,6 +183,7 @@ class Main:
     def remove_user(self, user_id: str):
         self.users.pop(user_id, None)
         player_controller = self.users_player_controllers.pop(user_id, None)
+        player_controller.get_player().is_active = False
         self.character_player_controllers[player_controller.get_player().name] = player_controller
 
     async def assign_character_to_user(self, user_id: str, char_name: str):
@@ -164,8 +197,8 @@ class Main:
     async def get_player_controller_by_char_name(self, char_name: str) -> PlayerController | None:
         return await self.__get_player_controller_by_char_name(char_name)
 
-    async def add_player_to_location(self, player, pos_x, pos_y, location_id):
-        location = self.__check_if_location_exists(location_id)
+    async def add_player_to_location(self, player, pos_x, pos_y, map_id):
+        location = self.__check_if_location_exists(map_id)
         await location.add_player(player, pos_x, pos_y)
 
     async def remove_player_from_location(self, player: Player, location_id):
@@ -198,4 +231,3 @@ class Main:
 
     async def __get_player_controller_by_user_id(self, user_id: str) -> PlayerController | None:
         return self.users_player_controllers.get(user_id, None)
-

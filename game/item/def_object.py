@@ -1,8 +1,11 @@
-import uuid
+from game.item_messages import item_messages
 
 
 class DefaultObject:
+    _DESTROY_ACTION = {"action": "destroy_me", "params": None}
+
     def __init__(self):
+        self.interact_system = None
         self.pos_x: int = 0
         self.pos_y: int = 0
         self.id: int = 0
@@ -10,9 +13,9 @@ class DefaultObject:
         self.__is_solid: bool = False
         self.__is_collectable: bool = False
         self.__is_consumable: bool = False
-        self.action: dict[str, object] = {"action": "do_nothing", "params": 0}
+        self.action: dict[str, object] = {"action": "do_nothing", "params": []}
         self.hp: int = -999
-        # self.world_map = None
+        self.world_map = None
 
     def get_world_map(self):
         return self.world_map
@@ -31,7 +34,7 @@ class DefaultObject:
         if self.hp > 0:
             self.hp -= amount
             if self.hp <= 0:
-                await self.world_map.remove_object_by_id(self.pos_x, self.pos_y, self.id)
+                await self.interact_system.interact(self, None, self._DESTROY_ACTION)
 
     def get_id(self):
         return self.id
@@ -60,8 +63,11 @@ class DefaultObject:
     def set_action(self, action: str):
         self.action = action
 
-    def use(self):
-        return self.action
+    async def use(self, actor):
+        await self.interact_system.interact(actor, self, self.action)
+
+    def get_message(self):
+        return item_messages.get(self.name, item_messages["default"])
 
     def __str__(self):
         return f"{self.id}: {self.name} {self.action} {self.pos_x} {self.pos_y}"

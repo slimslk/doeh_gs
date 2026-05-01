@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import select, delete
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
@@ -6,6 +8,7 @@ from models.models import Character, CharStats, GameObject
 from game.player import Player
 from utils.mapper import player_to_player_model, player_stats_to_stats_model, inventory_to_model
 
+logger = logging.getLogger("app")
 
 class CharacterRepository:
     def __init__(self):
@@ -16,14 +19,12 @@ class CharacterRepository:
         stats = player_stats_to_stats_model(player)
         game_object_models = inventory_to_model(player.inventory)
         character = player_to_player_model(player)
-        print(f"character: {character}, stats: {stats}")
 
         async for session in db_helper.session_getter():
             try:
                 session.add(character)
                 await session.flush()
 
-                print(f"created character: {character}")
                 stats.char_id = character.id
                 session.add(stats)
                 await session.flush()
@@ -37,7 +38,7 @@ class CharacterRepository:
                 return character
             except SQLAlchemyError as e:
                 await session.rollback()
-                print(e)
+                logger.error(e)
                 raise
 
     async def list_all_by_user_id(self, user_id: str) -> list[Character]:
@@ -80,7 +81,6 @@ class CharacterRepository:
                     .options(selectinload(Character.stats))
                 )
                 character: Character = result.scalar_one_or_none()
-                print(f"character: {character}")
                 if not character:
                     return None
 
@@ -101,7 +101,7 @@ class CharacterRepository:
                 return character
             except SQLAlchemyError as e:
                 await session.rollback()
-                print(e)
+                logger.error(e)
                 raise
 
     def _update_stats(self, character: Character, player: Player) -> Character:

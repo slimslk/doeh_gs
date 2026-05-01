@@ -1,10 +1,12 @@
 import asyncio
 import json
+import logging
 
 from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaError
 from config.settings import settings, consumer_kafka_settings
 
+logger = logging.getLogger("app")
 
 class AIOGameMapKafkaConsumer:
     _poll_timeout = 1
@@ -23,7 +25,7 @@ class AIOGameMapKafkaConsumer:
                 self.consumer.subscribe(self.topics)
                 await self.consumer.start()
             except KafkaError as err:
-                print(f"Consumer Kafka start error: {err}")
+                logger.error(f"Consumer Kafka start error: {err}", err)
                 return
             self._running = True
 
@@ -36,14 +38,14 @@ class AIOGameMapKafkaConsumer:
                         try:
                             await self.__process_messages(messages)
                         except KafkaError as err:
-                            print(f"Consumer Kafka start error: {err}")
+                            logger.error(f"Consumer Kafka start error: {err}", err)
                         except Exception as err:
-                            print(f"Exception: {err}")
-                            raise
+                            logger.error(f"Exception: {err}", err)
+                            # raise
                 except RuntimeError as err:
-                    print(f"Consumer Kafka error: {err}")
+                    logger.error(f"Consumer Kafka error: {err}", err)
         except asyncio.CancelledError:
-            print("Consumer task cancelled.")
+            logger.info("Consumer task cancelled.")
         finally:
             await self.close()
 

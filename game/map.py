@@ -1,6 +1,5 @@
 import uuid
 
-from game.item.corpse import Corpse
 from game.item.def_object import DefaultObject
 
 
@@ -52,36 +51,37 @@ class Map:
         })
         return removed_obj
 
-    async def remove_object_by_id(self, x, y, item_id: uuid.UUID):
+    async def remove_object_from_map(self, x, y, rm_item: DefaultObject):
         objects = self.location_map[x][y]
         for item in objects:
-            if item.id == item_id:
+            if item == rm_item:
                 self.location_map[x][y].remove(item)
         await self.notify_observers({
             self.map_id: {f"{x},{y}": self.location_map[x][y][0].name}
         })
 
-    async def place_object(self, object_type, x, y):
-        await self.place_objects([object_type], x, y)
-
-    async def place_objects(self, objects: list, x, y):
-        for obj in objects:
-            obj.set_position(x, y)
-        self.location_map[x][y][:0] = objects
+    async def place_game_object(self, object_type, x, y):
+        self.location_map[x][y].insert(0, object_type)
         await self.notify_observers({
             self.map_id: {f"{x},{y}": self.location_map[x][y][0].name}
         })
+        # await self.place_objects([object_type], x, y)
 
-    async def replace_object(self, object_type: DefaultObject, x, y, position=0):
-        if not object_type.is_solid():
-            if type(object_type) is Corpse:
-                self.location_map[x][y].pop(0)
-                self.location_map[x][y].insert(-1, object_type)
-            else:
-                self.location_map[x][y][position] = object_type
-            await self.notify_observers({
-                self.map_id: {f"{x},{y}": self.location_map[x][y][0].name}
-            })
+    async def place_game_objects(self, objects: list, x, y):
+        for game_obj in objects:
+            game_obj.set_position(x, y)
+            await self.place_game_object(game_obj, x, y)
+        # self.location_map[x][y][:0] = objects
+        # await self.notify_observers({
+        #     self.map_id: {f"{x},{y}": self.location_map[x][y][0].name}
+        # })
+
+    async def replace_object(self, game_object: DefaultObject, x, y, position=0):
+        self.location_map[x][y].pop(0)
+        self.location_map[x][y].insert(position, game_object)
+        await self.notify_observers({
+            self.map_id: {f"{x},{y}": self.location_map[x][y][0].name}
+        })
 
     async def move_player(self, player, old_x, old_y, new_x, new_y):
         self.location_map[new_x][new_y].insert(0, player)

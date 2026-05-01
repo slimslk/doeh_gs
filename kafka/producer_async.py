@@ -1,12 +1,17 @@
 import asyncio
 import json
+import logging
 import threading
+from typing import Any
 
 from aiokafka import AIOKafkaProducer
 
 from game.game_app import Main
 from game.queue_wrapper import DefaultBufferQueue
 from config.settings import settings, producer_kafka_settings
+from kafka.schemes.kafka_schemes import PlayerTopicScheme
+
+logger = logging.getLogger("app")
 
 
 class AIOGameMapKafkaProducer:
@@ -43,7 +48,7 @@ class AIOGameMapKafkaProducer:
                 self.producer = AIOKafkaProducer(**producer_kafka_settings.get_config())
                 await self.producer.start()
             except Exception as err:
-                print(f"Producer Kafka error: {err}")
+                logger.error(f"Producer Kafka error: {err}", err)
                 return
             self._is_running = True
 
@@ -65,11 +70,11 @@ class AIOGameMapKafkaProducer:
                             await self._send_game_updates(data)
                     self.game.unlock_all_users()
                 except Exception as err:
-                    print(f"Kafka producer error sending message: {err}")
-                    raise
+                    logger.error(f"Kafka producer error sending message: {err}", err)
+                    # raise
 
         except asyncio.CancelledError:
-            print("Producer task cancelled.")
+            logger.info("Producer task cancelled.")
         finally:
             await self.close()
             self._is_running = False
@@ -80,32 +85,37 @@ class AIOGameMapKafkaProducer:
 
     async def _send_game_updates(self, data):
         for key, value in data.items():
+            logger.info(f"PRODUCER - Send game updates: {key} : {value}")
             await self._send_message(self._game_updates_topic, key, value)
 
     async def _send_location_updates(self, data):
         for key, value in data.items():
+            logger.info(f"PRODUCER - Send location updates: {key} : {value}")
             await self._send_message(self._location_updates_topic, key, value)
 
-    async def _send_player_updates(self, data: dict[str, str]):
-        user_ids = self.game.users_player_controllers.keys()
-        for user_id in user_ids:
-            user_params: dict | None = data.get(user_id, None)
+    async def _send_player_updates(self, data: dict[str, dict[str, Any]]):
+        for user, controller in self.game.users_player_controllers.items():
+            user_params = data.get(user, None)
             if user_params is None:
-                player = self.game.users_player_controllers.get(user_id)
-                await player.skip_turn()
-                # user_params = player.get_player().get_player_parameters()
+                await controller.skip_turn()
                 continue
-            await self._send_message(self._player_updates_topic, user_id, user_params)
+            user_params["message"] = controller.get_player().message
+            payload = PlayerTopicScheme(**user_params)
+            logger.info(f"PRODUCER - Send user updates: {user} : {user_params}")
+            await self._send_message(self._player_updates_topic, user, payload.model_dump())
+            controller.get_player().message = []
+        for controller in self.game.character_player_controllers.values():
+            await controller.skip_turn()
 
     async def _send_message(self, topic, key, value):
+        logger.info(f"SEND TO WS SERVER - TOPIC: {topic}, KEY: {key}, VALUE: {value}")
         encoded_message = self._ecode_message(key, value)
         metadata = await self.producer.send_and_wait(topic=topic,
                                                      key=encoded_message.get("key"),
                                                      value=encoded_message.get("value"))
 
     def _ecode_message(self, key: str, value: dict) -> dict:
-        new_message = {
+        return {
             "key": key.encode("utf-8"),
             "value": json.dumps(value).encode("utf-8"),
         }
-        return new_message

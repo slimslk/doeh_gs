@@ -1,5 +1,10 @@
+import logging
+
+logger = logging.getLogger("app")
+
+
 def main():
-    print("Hello from crawler-gs-python!")
+    logger.info("Game server is starting...")
 
 
 if __name__ == "__main__":
