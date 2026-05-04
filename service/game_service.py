@@ -202,7 +202,6 @@ class KafkaGameManager(GameManager):
         match action_dto.action:
             case "logout":
                 player_controller: PlayerController = await self._game.get_player_controller_by_user_id(user_id)
-                print("Player logged out: ", player_controller.get_player().name)
                 if player_controller is None:
                     self.logger.info(f"Character not found")
                     return None

@@ -48,7 +48,6 @@ class GameInteractionSystem(DefaultInteractionSystem):
                 await actor.take_off_weapon(item, params)
             await item.use(actor)
         else:
-            print("Action", action)
             if hasattr(actor, "do_action"):
                 return await actor.do_action(action)
 
@@ -77,9 +76,7 @@ class GameInteractionSystem(DefaultInteractionSystem):
                 if quantity > 0:
                     for _ in range(quantity):
                         drop_chance = random.randint(0, 100)
-                        print(f"Drop rate {drop_rate}, drop chance: {drop_chance}, quantity: {quantity}")
                         if drop_chance <= drop_rate:
-                            print("Item: ", item)
                             await self.context.main_game.add_object_to_game_map(item, map_id, target.pos_x,
                                                                                 target.pos_y)
         return "opened"
