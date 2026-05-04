@@ -33,8 +33,8 @@ async def add_objects_to_map_in_random_places(main_game, map_id, object_type, am
 
 async def generate_main_location(context: GameContext) -> Location:
     main_game = context.main_game
-    location_height = 100
-    location_width = 100
+    location_height = 150
+    location_width = 150
     tree_coefficient = 0.2
     meet_coefficient = 0.01
     dummy_coefficient = 0.002
