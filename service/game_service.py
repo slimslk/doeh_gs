@@ -10,8 +10,8 @@ from actions.base_action_dto import BaseActionDto
 from context import GameContext
 from errors.action_errors import IncorrectActionValues
 from game.game_app import Main
-from game.player import Player
-from game.player_controller import PlayerController
+from game.player.player import Player
+from game.player.player_controller import PlayerController
 from game.queue_wrapper import DefaultBufferQueue
 from config.settings import settings
 from repository.repository import CharacterRepository

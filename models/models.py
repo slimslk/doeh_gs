@@ -44,6 +44,7 @@ class CharStats(Base):
     attack_damage: Mapped[int]
     defence: Mapped[int]
     is_dead: Mapped[bool] = mapped_column(default=False)
+    is_sleep: Mapped[bool] = mapped_column(default=False)
 
     character: Mapped["Character"] = relationship(
         "Character",

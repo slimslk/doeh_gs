@@ -7,10 +7,10 @@ from game.item.def_object import DefaultObject
 from game.location import Location
 from game.game_observer import GameObjectObserver
 from game.map import Map
-from game.player import Player
-from game.player_controller import PlayerController
+from game.player.player import Player
+from game.player.player_controller import PlayerController
 from game.location_generator import generate_main_location
-from game.item_constants import game_objects_list, GameObjectEnum
+from game.item.item_constants import game_objects_list, GameObjectEnum
 
 
 class Main:

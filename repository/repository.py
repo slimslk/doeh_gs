@@ -5,7 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 from db.db import db_helper
 from models.models import Character, CharStats, GameObject
-from game.player import Player
+from game.player.player import Player
 from utils.mapper import player_to_player_model, player_stats_to_stats_model, inventory_to_model
 
 logger = logging.getLogger("app")
@@ -116,6 +116,7 @@ class CharacterRepository:
         stats.attack_damage = player.attack_damage
         stats.defence = player.defence
         stats.is_dead = player.is_dead
+        stats.is_sleep = player.is_sleep
         return character
 
     async def delete(self, username: str, char_name: str) -> bool:

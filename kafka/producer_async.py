@@ -94,16 +94,16 @@ class AIOGameMapKafkaProducer:
             await self._send_message(self._location_updates_topic, key, value)
 
     async def _send_player_updates(self, data: dict[str, dict[str, Any]]):
-        for user, controller in self.game.users_player_controllers.items():
+        for user, controller in list(self.game.users_player_controllers.items()):
             user_params = data.get(user, None)
             if user_params is None:
                 await controller.skip_turn()
                 continue
-            user_params["message"] = controller.get_player().message
+            user_params["message"] = controller.get_player().messages
             payload = PlayerTopicScheme(**user_params)
             logger.info(f"PRODUCER - Send user updates: {user} : {user_params}")
             await self._send_message(self._player_updates_topic, user, payload.model_dump())
-            controller.get_player().message = []
+            controller.get_player().messages = []
         for controller in self.game.character_player_controllers.values():
             await controller.skip_turn()
 

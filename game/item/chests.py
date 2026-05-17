@@ -1,5 +1,5 @@
 from game.item.def_object import DefaultObject
-from game.item_constants import GameObjectEnum
+from game.item.item_constants import GameObjectEnum
 
 
 class OpenableObject(DefaultObject):
@@ -9,10 +9,14 @@ class OpenableObject(DefaultObject):
 
     def __init__(self):
         super().__init__()
-        self.name = "openable_object"
+        self.name = "openable object"
         self.set_solid(True)
         self.action = {"action": "open", "params": [(GameObjectEnum.DUMMY, 100, 1)]}
         self.is_open = False
+        self.action_message = "You did something."
+
+    def get_action_message(self):
+        return self.action_message
 
 
 class SimpleChest(OpenableObject):
@@ -22,16 +26,17 @@ class SimpleChest(OpenableObject):
 
     def __init__(self):
         super().__init__()
-        self.name = "simple_chest"
+        self.name = "simple chest"
         self.action = {"action": "open_chest", "params": [(GameObjectEnum.YELLOW_POTION, 50, 2),
                                                           (GameObjectEnum.RED_POTION, 15, 1),
                                                           (GameObjectEnum.PURPLE_POTION, 5, 1),
-                                                          (GameObjectEnum.SWORD, 25, 1),
+                                                          (GameObjectEnum.SWORD, 5, 1),
                                                           ]}
+        self.action_message = "The chest creaks open beneath your touch. What forgotten horror — or treasure — lies within?"
 
 
 class OpenedSimpleChest(DefaultObject):
     def __init__(self):
         super().__init__()
-        self.name = "opened_simple_chest"
+        self.name = "opened simple chest"
         self.action = {"action": "do_nothing"}

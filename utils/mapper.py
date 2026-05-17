@@ -1,8 +1,8 @@
 from actions.interaction_system import DefaultInteractionSystem
 from game.item.def_object import DefaultObject
-from game.player import Player
+from game.player.player import Player
 from models.models import CharStats, Character, GameObject
-from game.item_constants import game_objects_list, GameObjectEnum
+from game.item.item_constants import game_objects_list, GameObjectEnum
 
 
 def player_stats_to_stats_model(player: Player) -> CharStats:
@@ -17,6 +17,7 @@ def player_stats_to_stats_model(player: Player) -> CharStats:
         attack_damage=player.attack_damage,
         defence=player.defence,
         is_dead=player.is_dead,
+        is_sleep=player.is_sleep,
     )
 
 
@@ -83,6 +84,7 @@ def character_model_to_player(character: Character, interaction_system: DefaultI
     player.direction = (0, -1)
     player.inventory = game_objects_to_inventory(character.stats.inventory, context)
     player.is_dead = character.stats.is_dead
+    player.is_sleep = character.stats.is_sleep
     player.defence = character.stats.defence
     player.attack_modifier = character.stats.attack_modifier
     player.attack_damage = character.stats.attack_damage

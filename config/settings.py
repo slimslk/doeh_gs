@@ -31,7 +31,7 @@ logger.addHandler(log_handler)
 class PlayerSettings(BaseModel):
     max_health: int = 100
     max_energy: int = 100
-    max_hungry: int = 10 * 60 * 1000  # The player can survive for 10 minutes with a full hunger bar.
+    max_hungry: int = 600  # The player can survive for 10 minutes with a full hunger bar.
     default_defence: int = 8
     default_attack_modifier: int = 0
     default_attack_damage: int = 4

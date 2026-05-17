@@ -10,6 +10,13 @@ from game.map import Map
 from game.item.def_object import DefaultObject
 from game.game_observer import GameObjectObserver
 from config.settings import settings
+from game.player.player_messages import (HUNGER_STATES,
+                                         PLAYER_ATTACK_MESSAGE,
+                                         ENEMY_DEFEAT_MESSAGE,
+                                         ENEMY_DAMAGE_MESSAGE,
+                                         AWAKE_MESSAGES,
+                                         SLEEP_MESSAGES,
+                                         )
 
 DEFAULT_ACTION = "do_nothing"
 
@@ -18,16 +25,9 @@ class Player:
     __GAME_TICK = settings.game.tick
     __MAX_HEALTH = settings.player.max_health
     __MAX_ENERGY = settings.player.max_energy
-    __MAX_HUNGRY = settings.player.max_hungry / __GAME_TICK
+    __MAX_HUNGRY = settings.player.max_hungry * 1000 // __GAME_TICK
     __is_solid: bool = True
     char_id: int = -1
-    HUNGER_STATES = [
-        (0, "I'm dying!"),
-        (0.10, "I'm starving! I need food immediately!"),
-        (0.25, "I'm very hungry… I need food soon."),
-        (0.50, "I'm quite hungry now."),
-        (0.80, "I'm starting to feel hungry."),
-    ]
 
     def __init__(self, user_id, name, interact_system: DefaultInteractionSystem):
         self.user_id = user_id
@@ -53,7 +53,7 @@ class Player:
         self.equipped_weapon = None
         self.equipped_defence = None
 
-        self.message = []
+        self.messages = []
         self.hunger_state = 1
 
     def add_observer(self, observer: GameObjectObserver):
@@ -82,7 +82,7 @@ class Player:
         self.world = world
         await self.notify_observers()
 
-    async def is_solid(self):
+    def is_solid(self):
         return self.__is_solid
 
     # =========== Action methods =============== #
@@ -94,8 +94,8 @@ class Player:
             self.hungry = 0
             await self.decrease_health(5)
         message = self.__get_hunger_state(hunger=self.hungry, max_hunger=self.__MAX_HUNGRY)
-        if self.message:
-            self.message.append(message)
+        if message:
+            self.messages.append(message)
             await self.notify_observers()
 
     async def decrease_hungry(self, amount: int):
@@ -107,7 +107,7 @@ class Player:
 
     def __get_hunger_state(self, hunger, max_hunger):
         hunger_in_percent = hunger / max_hunger
-        for threshold, state in self.HUNGER_STATES:
+        for threshold, state in HUNGER_STATES:
             if hunger_in_percent <= threshold:
                 if self.hunger_state != state:
                     return state
@@ -118,14 +118,6 @@ class Player:
         self.energy -= amount
         if self.energy < 0:
             self.energy = 0
-        # if self.energy == 100*0.75:
-        #     await self.notify_observers()
-        # if self.energy == 100*0.5:
-        #     await self.notify_observers()
-        # if self.energy == 100*0.25:
-        #     await self.notify_observers()
-        # if self.energy < 100 * 0.1:
-        #     await self.notify_observers()
         await self.notify_observers()
 
     async def increase_energy(self, amount: int):
@@ -192,6 +184,7 @@ class Player:
         await item.get_world_map().remove_first_object(x, y)
         item.set_position(-1, -1)
         self.inventory.append(item)
+        self.messages.append(f"You picked up: {item.get_message()}")
         await self.notify_observers()
 
     async def interact(self, direction: tuple[int, int] = None):
@@ -225,29 +218,42 @@ class Player:
             item = self.inventory[index]
             await self.interact_system.interact(self, item, item.action)
             if isinstance(item, DefaultConsumableObject):
-                self.message.append(item.get_consume_message())
+                self.messages.append(item.get_consume_message())
                 self.inventory.pop(index)
         await self.notify_observers()
 
-    async def attack(self, direction: tuple[int, int] = None):
+    async def attack(self, direction: tuple[int, int] | None = None):
         power = (self.attack_modifier, self.attack_damage)
         await self.decrease_energy(1)
         if direction:
             obj = self.world.get_first_object(self.pos_x + direction[0], self.pos_y + direction[1])
         else:
             obj = self.world.get_first_object(self.pos_x + self.direction[0], self.pos_y + self.direction[1])
-        if power:
-            attack_power = random.randint(1, 20) + power[0]
-            damage = random.randint(1, power[1])
-        else:
-            attack_power = random.randint(1, 20) + self.attack_modifier
-            damage = random.randint(1, self.attack_damage)
+        attack_power = random.randint(1, 20) + self.attack_modifier
+        damage = random.randint(1, self.attack_damage)
         if isinstance(obj, Player):
             if obj.defence < attack_power:
                 await obj.decrease_health(damage)
+                message = self.__get_player_attack_message(obj, damage)
+                self.messages.append(message)
         if isinstance(obj, DefaultObject):
             await obj.decrease_hp(damage)
         await self.notify_observers()
+
+    def __get_player_attack_message(self, enemy, damage) -> str:
+        message = ""
+        messages = ENEMY_DAMAGE_MESSAGE
+        for threshold, state in PLAYER_ATTACK_MESSAGE:
+            if damage <= threshold:
+                message += state
+                break
+        if enemy.is_dead:
+            messages = ENEMY_DEFEAT_MESSAGE
+        for threshold, state in messages:
+            if enemy.health <= threshold:
+                message += " " + state
+                break
+        return message
 
     async def skip_turn(self):
         if self.skip_counter <= (5 * 1000) / self.__GAME_TICK:
@@ -286,12 +292,18 @@ class Player:
         self.is_sleep = True
 
     async def awake(self):
-        self.is_sleep = False
+        if self.is_sleep:
+            self.is_sleep = False
+            self.messages.append(random.choice(AWAKE_MESSAGES))
+            await self.notify_observers()
 
     async def do_action(self, action: dict):
         if self.__check_is_player_dead():
             return None
         if self.is_sleep and action.get("action") != "awake":
+            if action.get("action") != "skip_turn":
+                self.messages.append(random.choice(SLEEP_MESSAGES))
+            await self.notify_observers()
             return None
         await self.increase_hungry(1)
         action_name = action.get("action", DEFAULT_ACTION)

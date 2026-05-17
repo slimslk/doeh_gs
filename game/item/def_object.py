@@ -1,4 +1,4 @@
-from game.item_messages import item_messages
+from game.item.item_messages import get_item_message
 
 
 class DefaultObject:
@@ -67,7 +67,7 @@ class DefaultObject:
         await self.interact_system.interact(actor, self, self.action)
 
     def get_message(self):
-        return item_messages.get(self.name, item_messages["default"])
+        return get_item_message(self.name)
 
     def __str__(self):
         return f"{self.id}: {self.name} {self.action} {self.pos_x} {self.pos_y}"

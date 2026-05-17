@@ -18,6 +18,7 @@ class Weapon(DefaultObject):
             self.action["action"] = "equip_weapon"
             self.name = self.name[:-1]
 
+
 class Sword(Weapon):
     def __init__(self):
         super().__init__()

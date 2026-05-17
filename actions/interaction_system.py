@@ -55,7 +55,9 @@ class GameInteractionSystem(DefaultInteractionSystem):
         if action == "destroy_me":
             return await self.__destroy_object(actor)
         if action == "open_chest":
-            return await self.__open_object(target)
+            message = await self.__open_object(target)
+            actor.messages.append(message)
+            return
 
     async def __destroy_object(self, actor) -> str | None:
         game_map: Map = getattr(actor, "world_map", None)
@@ -79,4 +81,5 @@ class GameInteractionSystem(DefaultInteractionSystem):
                         if drop_chance <= drop_rate:
                             await self.context.main_game.add_object_to_game_map(item, map_id, target.pos_x,
                                                                                 target.pos_y)
-        return "opened"
+
+        return target.get_action_message()

@@ -1,4 +1,4 @@
-from game.player import Player
+from game.player.player import Player
 
 
 class PlayerController:

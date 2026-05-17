@@ -2,7 +2,7 @@ from errors.errors import ObjectPositionIsOutOfBoundsError, PositionIsOccupiedEr
 from game.item.def_object import DefaultObject
 from game.item.grass import Grass
 from game.map import Map
-from game.player import Player
+from game.player.player import Player
 
 
 class Location:
