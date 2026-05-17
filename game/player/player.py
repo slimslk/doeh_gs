@@ -10,7 +10,7 @@ from game.map import Map
 from game.item.def_object import DefaultObject
 from game.game_observer import GameObjectObserver
 from config.settings import settings
-from game.player.player_messages import (HUNGER_STATES,
+from game.player.player_messages import (HUNGER_MESSAGES,
                                          PLAYER_ATTACK_MESSAGE,
                                          ENEMY_DEFEAT_MESSAGE,
                                          ENEMY_DAMAGE_MESSAGE,
@@ -26,6 +26,7 @@ class Player:
     __MAX_HEALTH = settings.player.max_health
     __MAX_ENERGY = settings.player.max_energy
     __MAX_HUNGRY = settings.player.max_hungry * 1000 // __GAME_TICK
+    __HUNGER_STATE = [0, 10, 25, 50, 80, 100]
     __is_solid: bool = True
     char_id: int = -1
 
@@ -103,14 +104,16 @@ class Player:
         self.hungry += amount
         if self.hungry > self.__MAX_HUNGRY:
             self.hungry = self.__MAX_HUNGRY
+        self.__get_hunger_state(hunger=self.hungry, max_hunger=self.__MAX_HUNGRY)
         await self.notify_observers()
 
     def __get_hunger_state(self, hunger, max_hunger):
-        hunger_in_percent = hunger / max_hunger
-        for threshold, state in HUNGER_STATES:
-            if hunger_in_percent <= threshold:
+        hunger_in_percent = hunger / max_hunger * 100
+        for state in self.__HUNGER_STATE:
+            if hunger_in_percent <= state:
                 if self.hunger_state != state:
-                    return state
+                    self.hunger_state = state
+                    return HUNGER_MESSAGES.get(state)
                 return None
 
     async def decrease_energy(self, amount: int):
@@ -330,7 +333,7 @@ class Player:
             "name": self.name,
             "health": self.health,
             "energy": self.energy,
-            "hungry": self.hungry,
+            # "hungry": self.hungry,
             "position": (self.pos_x, self.pos_y),
             "direction": self.direction,
             "inventory": [item.name for item in self.inventory],
@@ -340,6 +343,7 @@ class Player:
             "defence": self.defence,
             "is_dead": self.is_dead,
             "is_sleep": self.is_sleep,
+            "hungry": self.hunger_state
         }
 
     async def process_death(self):

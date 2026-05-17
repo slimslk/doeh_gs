@@ -9,7 +9,7 @@ from game.game_observer import GameObjectObserver
 from game.map import Map
 from game.player.player import Player
 from game.player.player_controller import PlayerController
-from game.location_generator import generate_main_location
+from locations.location_generator import generate_main_location
 from game.item.item_constants import game_objects_list, GameObjectEnum
 
 
@@ -220,8 +220,8 @@ class Main:
     def __check_if_location_exists(self, location_id) -> Location:
         location = self.locations.get(location_id, None)
         if location is None:
-            # TODO: Temporarily, fall back to the main location if the location is missing. Later this will be replaced
-            #  with restoring the location from storage.
+            # TODO: Temporarily, fall back to the main locations if the locations is missing. Later this will be replaced
+            #  with restoring the locations from storage.
             location = self.main_location
             # raise LocationNotFoundError(location_id)
         return location

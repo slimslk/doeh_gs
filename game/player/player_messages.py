@@ -1,10 +1,10 @@
-HUNGER_STATES = [
-    (0, "I'm dying!"),
-    (0.10, "I'm starving! I need food immediately!"),
-    (0.25, "I'm very hungry… I need food soon."),
-    (0.50, "I'm quite hungry now."),
-    (0.80, "I'm starting to feel hungry."),
-]
+HUNGER_MESSAGES = {
+    0: "I'm dying!",
+    10: "I'm starving! I need food immediately!",
+    25: "I'm very hungry… I need food soon.",
+    50: "I'm quite hungry now.",
+    80: "I'm starting to feel hungry.",
+}
 
 PLAYER_ATTACK_MESSAGE = [
     (5, "Your blade barely kisses the flesh, yet the darkness drinks the pain."),
