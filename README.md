@@ -58,3 +58,15 @@ docker build -t game-engine-python .
 
 # Run the engine
 docker run --env-file .env game-engine-python
+```
+---
+
+## ⚖️ Legal & Licensing
+
+**Copyright © 2025-2026 Dmytro Kuzavkov (slimslk). All rights reserved.**
+
+This software and its associated files are **proprietary** and confidential. 
+Unauthorized copying, distribution, or modification of this code, via any medium, is strictly prohibited. 
+
+The source code is provided on GitHub for **portfolio review and educational purposes only**. 
+If you wish to use any part of this project for commercial purposes or public distribution, please contact the author at d.kuzavkov@gmail.com.
