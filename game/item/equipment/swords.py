@@ -1,9 +1,12 @@
+from factory.decorators import register_game_object
+from factory.lifecycle import GameObjectLifecycleEnum
 from game.item.def_object import DefaultObject
+from game.item.item_constants import GameObjectEnum
 
 
 class Weapon(DefaultObject):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, interact_system):
+        super().__init__(interact_system)
         self.set_collectable(True)
         self.hp = 100
 
@@ -19,8 +22,12 @@ class Weapon(DefaultObject):
             self.name = self.name[:-1]
 
 
-class Sword(Weapon):
-    def __init__(self):
-        super().__init__()
+@register_game_object(
+    name=GameObjectEnum.RUSTY_SWORD,
+    lifecycle=GameObjectLifecycleEnum.PROTOTYPE
+)
+class RustySword(Weapon):
+    def __init__(self, interact_system):
+        super().__init__(interact_system)
         self.action = {"action": "equip_weapon", "params": [(1, 12)]}
-        self.name = "sword"
+        self.name = GameObjectEnum.RUSTY_SWORD.value

@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 from errors.errors import DefaultError
+from factory.game_object_factory import GameObjectFactory
 from game.game_app import Main
 from game.game_observer import KafkaMapObserver, KafkaPlayerObserver
 from actions.interaction_system import GameInteractionSystem
@@ -12,23 +13,45 @@ from repository.repository import CharacterRepository
 from service.game_service import KafkaGameManager
 from config.settings import settings
 from db.db import db_helper
-from context import GameContext
+from context import get_application_context, GameContext
+from factory.registry import desc_registry
+from main_constants import (GAME_OBJECT_FACTORY_CONTEXT_NAME,
+                            MAIN_GAME_CONTEXT_NAME,
+                            INTERATION_SYSTEM_CONTEXT_NAME,
+                            GAME_SERVICE_CONTEXT_NAME,
+                            GAME_OBJECTS_PACKAGE,)
+from utils.discovery import discover_game_objects
 
 logger = logging.getLogger("app")
 
 
-async def main():
+async def main(game_context: GameContext):
     __GAME_TICK = settings.game.tick
     stop_event = None
     consumer_task = None
     producer_task = None
     try:
-        game = Main()
+        discover_game_objects(GAME_OBJECTS_PACKAGE)
+        interaction_system = GameInteractionSystem(game_context)
+        game_object_factory = GameObjectFactory(interaction_system)
+
+        game = Main(game_context, game_object_factory=game_object_factory)
         output_queue = BufferQueueWithLock()
         stop_event = asyncio.Event()
         char_repository = CharacterRepository()
         kafka_map_producer = AIOGameMapKafkaProducer(output_queue, game, tick=__GAME_TICK)
-        game_manager = KafkaGameManager(game, kafka_map_producer, output_queue, char_repository)
+        game_manager = KafkaGameManager(context=game_context,
+                                        game=game,
+                                        kafka_producer=kafka_map_producer,
+                                        output_queue=output_queue,
+                                        char_repository=char_repository)
+        desc_registry.bind_to_factory(game_object_factory)
+
+        game_context.add_context(GAME_OBJECT_FACTORY_CONTEXT_NAME, game_object_factory)
+        game_context.add_context(MAIN_GAME_CONTEXT_NAME, game)
+        game_context.add_context(INTERATION_SYSTEM_CONTEXT_NAME, interaction_system)
+        game_context.add_context(GAME_SERVICE_CONTEXT_NAME, game_manager)
+
         kafka_observer = KafkaMapObserver(output_queue)
         player_observer = KafkaPlayerObserver(output_queue)
         game.add_map_observer(kafka_observer)
@@ -41,11 +64,10 @@ async def main():
         producer_task = asyncio.create_task(kafka_map_producer.run(stop_event))
         consumer_task = asyncio.create_task(kafka_game_event_consumer.run(stop_event))
 
-        interaction_system = GameInteractionSystem()
-        context = GameContext(game_service=game_manager, main_game=game, interation_system=interaction_system)
         await game_manager.generate_main_location()
 
         result = await asyncio.gather(consumer_task, producer_task)
+        print("Started")
         for er in result:
             if isinstance(er, DefaultError):
                 logger.error(f"GameError: {er}")
@@ -68,6 +90,6 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        asyncio.run(main(get_application_context()))
     except KeyboardInterrupt:
         logger.info("Shutting down gracefully...")

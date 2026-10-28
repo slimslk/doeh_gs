@@ -111,7 +111,7 @@ class CharacterRepository:
         stats.hungry = player.hungry
         stats.position_x = player.pos_x
         stats.position_y = player.pos_y
-        stats.location_id = player.world.map_id
+        stats.location_id = player.location.get_map().map_id
         stats.attack_modifier = player.attack_modifier
         stats.attack_damage = player.attack_damage
         stats.defence = player.defence

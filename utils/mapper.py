@@ -1,8 +1,11 @@
 from actions.interaction_system import DefaultInteractionSystem
+from factory.game_object_factory import GameObjectFactory
 from game.item.def_object import DefaultObject
 from game.player.player import Player
+from main_constants import GAME_OBJECT_FACTORY_CONTEXT_NAME
 from models.models import CharStats, Character, GameObject
-from game.item.item_constants import game_objects_list, GameObjectEnum
+from game.item.item_constants import GameObjectEnum
+from context import get_application_context
 
 
 def player_stats_to_stats_model(player: Player) -> CharStats:
@@ -12,7 +15,7 @@ def player_stats_to_stats_model(player: Player) -> CharStats:
         hungry=player.hungry,
         position_x=player.pos_x,
         position_y=player.pos_y,
-        location_id=player.world.map_id,
+        location_id=player.location.map_id,
         attack_modifier=player.attack_modifier,
         attack_damage=player.attack_damage,
         defence=player.defence,
@@ -33,6 +36,7 @@ def inventory_to_model(inventory: list[DefaultObject]) -> list[GameObject]:
 
 
 def game_object_to_model(game_obj: DefaultObject):
+    print(game_obj, "->",game_obj.name)
     return GameObject(
         name=game_obj.name,
         pos_x=game_obj.pos_x,
@@ -45,14 +49,15 @@ def game_object_to_model(game_obj: DefaultObject):
     )
 
 
-def game_object_model_to_game_object(game_obj: GameObject, context) -> DefaultObject | None:
+def game_object_model_to_game_object(game_obj: GameObject) -> DefaultObject | None:
     name = game_obj.name[:-1] if game_obj.name[-1] == "*" else game_obj.name
     try:
         obj_enum = GameObjectEnum(name)
     except ValueError:
         return None
 
-    obj: DefaultObject = game_objects_list.get(obj_enum, None)()
+    game_obj_factory: GameObjectFactory = get_application_context().get_context(GAME_OBJECT_FACTORY_CONTEXT_NAME)
+    obj = game_obj_factory.get(obj_enum)
     if obj is None:
         return None
 
@@ -65,15 +70,14 @@ def game_object_model_to_game_object(game_obj: GameObject, context) -> DefaultOb
     obj.__is_consumable = game_obj.is_consumable
     obj.action = game_obj.action
     obj.hp = game_obj.hp
-    obj.interact_system = context.interaction_system
     return obj
 
 
-def game_objects_to_inventory(game_objects: list[GameObject], context) -> list[DefaultObject]:
-    return [game_object_model_to_game_object(game_obj, context) for game_obj in game_objects if game_obj is not None]
+def game_objects_to_inventory(game_objects: list[GameObject]) -> list[DefaultObject]:
+    return [game_object_model_to_game_object(game_obj) for game_obj in game_objects if game_obj is not None]
 
 
-def character_model_to_player(character: Character, interaction_system: DefaultInteractionSystem, context) -> Player:
+def character_model_to_player(character: Character, interaction_system: DefaultInteractionSystem) -> Player:
     player = Player(character.user_id, character.name, interaction_system)
     player.char_id = character.id
     player.health = character.stats.health
@@ -82,7 +86,7 @@ def character_model_to_player(character: Character, interaction_system: DefaultI
     player.energy = character.stats.energy
     player.hungry = character.stats.hungry
     player.direction = (0, -1)
-    player.inventory = game_objects_to_inventory(character.stats.inventory, context)
+    player.inventory = game_objects_to_inventory(character.stats.inventory)
     player.is_dead = character.stats.is_dead
     player.is_sleep = character.stats.is_sleep
     player.defence = character.stats.defence

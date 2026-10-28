@@ -4,13 +4,15 @@ from typing import Any
 
 from actions.actions import OBJECT_ACTIONS, PLAYER_ACTIONS, ITEM_ACTIONS
 from context import GameContext
-from game.item.chests import OpenableObject, OpenedSimpleChest
+from game.item.chests import OpenableObject
+from game.item.item_constants import GameObjectEnum
 from game.map import Map
+from main_constants import MAIN_GAME_CONTEXT_NAME
 
 
 class DefaultInteractionSystem(ABC):
-    def __init__(self):
-        self._context: GameContext | None = None
+    def __init__(self, context: GameContext) -> None:
+        self._context: GameContext = context
 
     @property
     def context(self) -> GameContext:
@@ -58,11 +60,13 @@ class GameInteractionSystem(DefaultInteractionSystem):
             message = await self.__open_object(target)
             actor.messages.append(message)
             return
+        if action == "enter":
+            pass
 
     async def __destroy_object(self, actor) -> str | None:
         game_map: Map = getattr(actor, "world_map", None)
         if game_map:
-            await self.context.main_game.remove_object_from_game_map(actor, game_map, actor.pos_x, actor.pos_y)
+            await self.context.get_context(MAIN_GAME_CONTEXT_NAME).remove_object_from_game_map(actor, game_map, actor.pos_x, actor.pos_y)
         else:
             return
         return "destroyed"
@@ -73,13 +77,18 @@ class GameInteractionSystem(DefaultInteractionSystem):
             if not game_map:
                 return
             map_id = game_map.map_id
-            await self.context.main_game.replace_top_object(OpenedSimpleChest(), map_id, target.pos_x, target.pos_y)
+            await self.context.get_context(MAIN_GAME_CONTEXT_NAME).replace_top_object(
+                GameObjectEnum.OPENED_SIMPLE_CHEST,
+                map_id,
+                target.pos_x,
+                target.pos_y
+            )
             for item, drop_rate, quantity in target.action["params"]:
                 if quantity > 0:
                     for _ in range(quantity):
                         drop_chance = random.randint(0, 100)
                         if drop_chance <= drop_rate:
-                            await self.context.main_game.add_object_to_game_map(item, map_id, target.pos_x,
+                            await self.context.get_context(MAIN_GAME_CONTEXT_NAME).add_object_to_game_map(item, map_id, target.pos_x,
                                                                                 target.pos_y)
 
         return target.get_action_message()

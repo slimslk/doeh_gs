@@ -1,9 +1,16 @@
+from factory.decorators import register_game_object
+from factory.lifecycle import GameObjectLifecycleEnum
 from game.item.def_object import DefaultObject
+from game.item.item_constants import GameObjectEnum
 
 
+@register_game_object(
+    name=GameObjectEnum.DUMMY,
+    lifecycle=GameObjectLifecycleEnum.PROTOTYPE
+)
 class Dummy(DefaultObject):
-    def __init__(self):
-        super().__init__()
-        self.name = "dummy"
+    def __init__(self, interact_system):
+        super().__init__(interact_system)
+        self.name = GameObjectEnum.DUMMY.value
         self.hp = 100
         self.set_solid(True)

@@ -1,0 +1,5 @@
+GAME_OBJECT_FACTORY_CONTEXT_NAME = "game_object_factory"
+GAME_SERVICE_CONTEXT_NAME = "game_service"
+MAIN_GAME_CONTEXT_NAME = "main_game"
+INTERATION_SYSTEM_CONTEXT_NAME = "interation_system"
+GAME_OBJECTS_PACKAGE = "game.item"

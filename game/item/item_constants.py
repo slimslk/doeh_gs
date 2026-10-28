@@ -1,36 +1,24 @@
 from enum import Enum
 
-from game.item.corpse import Corpse
-from game.item.dummy import Dummy
-from game.item.grass import Grass
-from game.item.consumable.meat import Meat
-from game.item.consumable.purple_potion import SleepPotion
-from game.item.consumable.red_potion import HealthPotion
-from game.item.sword import Sword
-from game.item.tree import Tree
-from game.item.consumable.yellow_potion import EnergyPotion
-
 
 class GameObjectEnum(Enum):
+    VOID = "void"
     CORPSE = "corpse"
     DUMMY = "dummy"
     GRASS = "grass"
-    MEAT = "meat"
-    PURPLE_POTION = "purple potion"
-    RED_POTION = "red potion"
-    SWORD = "sword"
+    SLEEP_POTION = "purple potion"
+    RUSTY_SWORD = "rusty sword"
     TREE = "tree"
-    YELLOW_POTION = "yellow potion"
-
-
-game_objects_list = {
-    GameObjectEnum.CORPSE: Corpse,
-    GameObjectEnum.DUMMY: Dummy,
-    GameObjectEnum.GRASS: Grass,
-    GameObjectEnum.MEAT: Meat,
-    GameObjectEnum.PURPLE_POTION: SleepPotion,
-    GameObjectEnum.RED_POTION: HealthPotion,
-    GameObjectEnum.SWORD: Sword,
-    GameObjectEnum.TREE: Tree,
-    GameObjectEnum.YELLOW_POTION: EnergyPotion,
-}
+    SIMPLE_CHEST = "simple chest"
+    OPENED_SIMPLE_CHEST = "opened simple chest"
+    DUNGEON_WALL = "dungeon wall"
+    DUNGEON_STONE_TILE = "dungeon stone tile"
+    MASTERWORK_ENERGY_POTION = "masterwork yellow potion"
+    DISTILLED_ENERGY_POTION = "yellow potion"
+    POOR_ENERGY_POTION = "poor yellow potion"
+    SMALL_HEALTH_POTION = "small red potion"
+    RAW_MEAT = "raw meat"
+    DUNGEON_ENTRANCE = "dungeon entrance"
+    DUNGEON_EXIT = "dungeon exit"
+    DUNGEON_STAIRS_UP = "dungeon stairs up"
+    DUNGEON_STAIRS_DOWN = "dungeon stairs down"

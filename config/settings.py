@@ -12,6 +12,8 @@ from pydantic_settings import (
     DotEnvSettingsSource,
     SettingsConfigDict
 )
+
+from errors.errors import IncorrectContextNameError
 from utils.helper import build_from_settings
 
 log_handler = RotatingFileHandler(

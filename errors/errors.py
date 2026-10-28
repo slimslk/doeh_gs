@@ -51,3 +51,12 @@ class PlayerNotFoundError(DefaultError):
 class GameMapConsumerError(DefaultError):
     def __init__(self, err):
         super().__init__({err})
+
+
+class UnknownGameObjectError(DefaultError):
+    def __init__(self, name):
+        super().__init__(f'Unknown game object {name}')
+
+class IncorrectContextNameError(DefaultError):
+    def __init__(self, name):
+        super().__init__(f'Incorrect context name {name}')

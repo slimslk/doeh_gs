@@ -4,19 +4,20 @@ import random
 from errors.action_errors import IncorrectActionValues
 from actions.interaction_system import DefaultInteractionSystem
 from game.item.consumable.consumable_obj import DefaultConsumableObject
-from game.item.corpse import Corpse
-from game.item.sword import Weapon
+from game.item.equipment.swords import Weapon
+from game.item.item_constants import GameObjectEnum
+# from game.location import Location
 from game.map import Map
 from game.item.def_object import DefaultObject
 from game.game_observer import GameObjectObserver
 from config.settings import settings
-from game.player.player_messages import (HUNGER_MESSAGES,
-                                         PLAYER_ATTACK_MESSAGE,
-                                         ENEMY_DEFEAT_MESSAGE,
-                                         ENEMY_DAMAGE_MESSAGE,
-                                         AWAKE_MESSAGES,
-                                         SLEEP_MESSAGES,
-                                         )
+from message.player_messages import (HUNGER_MESSAGES,
+                                     PLAYER_ATTACK_MESSAGE,
+                                     ENEMY_DEFEAT_MESSAGE,
+                                     ENEMY_DAMAGE_MESSAGE,
+                                     AWAKE_MESSAGES,
+                                     SLEEP_MESSAGES,
+                                     )
 
 DEFAULT_ACTION = "do_nothing"
 
@@ -38,7 +39,7 @@ class Player:
         self.health = self.__MAX_HEALTH
         self.energy = self.__MAX_ENERGY
         self.hungry = self.__MAX_HUNGRY
-        self.world: Map | None = None
+        self.location: "Location" | None = None
         self.direction = (0, -1)
         self.inventory: list[DefaultObject] = []
         self.is_dead = False
@@ -79,8 +80,11 @@ class Player:
         self.defence = defence
         await self.notify_observers()
 
-    async def set_map(self, world: Map):
-        self.world = world
+    def set_location(self, location: "Location"):
+        self.location = location
+
+    async def set_location_with_notification(self, location: "Location"):
+        self.set_location(location)
         await self.notify_observers()
 
     def is_solid(self):
@@ -149,9 +153,11 @@ class Player:
     Left: (0, -1)
     Down: (1, 0)
     Up: (-1, 0)
-    Diagonals: (1, 1), (1, -1) , (-1, 1), (-1, -1)"""
+    Diagonals: (1, 1), (1, -1) , (-1, 1), (-1, -1)
+    """
 
     async def move(self, direction: tuple[int, int], steps: int):
+        location_map: Map = self.location.get_map()
         steps = int(steps)
         if self.energy <= 0:
             return
@@ -167,12 +173,12 @@ class Player:
             self.pos_x += direction[0]
             self.pos_y += direction[1]
             if (self.pos_x < 0 or self.pos_y < 0 or
-                    self.pos_x > (self.world.get_map_size()[0] - 1) or (self.pos_y > self.world.get_map_size()[1] - 1)):
+                    self.pos_x > (location_map.get_map_size()[0] - 1) or (self.pos_y > location_map.get_map_size()[1] - 1)):
                 self.pos_x -= direction[0]
                 self.pos_y -= direction[1]
                 break
             steps_count += 1
-            if self.world.get_first_object(self.pos_x, self.pos_y).is_solid():
+            if location_map.get_first_object(self.pos_x, self.pos_y).is_solid():
                 if steps_count > 1:
                     self.health -= (steps_count - 1) * 10
                 self.pos_x -= direction[0]
@@ -181,7 +187,7 @@ class Player:
 
         if old_pos_x != self.pos_x or old_pos_y != self.pos_y:
             await self.notify_observers()
-            await self.world.move_player(self, old_pos_x, old_pos_y, self.pos_x, self.pos_y)
+            await location_map.move_player(self, old_pos_x, old_pos_y, self.pos_x, self.pos_y)
 
     async def __take_object(self, item, x, y):
         await item.get_world_map().remove_first_object(x, y)
@@ -198,7 +204,7 @@ class Player:
         else:
             x = self.pos_x + self.direction[0]
             y = self.pos_y + self.direction[1]
-        item = self.world.get_first_object(x, y)
+        item = self.location.get_map().get_first_object(x, y)
         if isinstance(item, DefaultObject):
             if item.is_collectable():
                 await self.__take_object(item, x, y)
@@ -219,6 +225,7 @@ class Player:
         else:
             await self.decrease_energy(1)
             item = self.inventory[index]
+            print(self.interact_system)
             await self.interact_system.interact(self, item, item.action)
             if isinstance(item, DefaultConsumableObject):
                 self.messages.append(item.get_consume_message())
@@ -226,12 +233,12 @@ class Player:
         await self.notify_observers()
 
     async def attack(self, direction: tuple[int, int] | None = None):
-        power = (self.attack_modifier, self.attack_damage)
+        # power = (self.attack_modifier, self.attack_damage)
         await self.decrease_energy(1)
         if direction:
-            obj = self.world.get_first_object(self.pos_x + direction[0], self.pos_y + direction[1])
+            obj = self.location.get_map().get_first_object(self.pos_x + direction[0], self.pos_y + direction[1])
         else:
-            obj = self.world.get_first_object(self.pos_x + self.direction[0], self.pos_y + self.direction[1])
+            obj = self.location.get_map().get_first_object(self.pos_x + self.direction[0], self.pos_y + self.direction[1])
         attack_power = random.randint(1, 20) + self.attack_modifier
         damage = random.randint(1, self.attack_damage)
         if isinstance(obj, Player):
@@ -337,7 +344,7 @@ class Player:
             "position": (self.pos_x, self.pos_y),
             "direction": self.direction,
             "inventory": [item.name for item in self.inventory],
-            "location_id": self.world.map_id,
+            "location_id": self.location.get_map().map_id,
             "attack_modifier": self.attack_modifier,
             "attack_damage": self.attack_damage,
             "defence": self.defence,
@@ -347,17 +354,15 @@ class Player:
         }
 
     async def process_death(self):
-        corpse = Corpse()
-        corpse.corpse_name = self.name
-        await self.world.replace_object(corpse, self.pos_x, self.pos_y, position=-1)
+        await self.location.spawn_and_replace_object_on_map(GameObjectEnum.CORPSE, self.pos_x, self.pos_y, position=-1)
         self.is_dead = True
+        x = self.pos_x
+        y = self.pos_y
         for item in self.inventory:
-            x = self.pos_x
-            y = self.pos_y
-            while (x == self.pos_x and y == self.pos_y) or self.world.location_map[x][y][0].is_solid():
+            while (x == self.pos_x and y == self.pos_y) or self.location.get_map().location_map[x][y][0].is_solid():
                 x = self.pos_x + random.randint(0, 1)
                 y = self.pos_y + random.randint(0, 1)
-            await self.world.place_game_object(item, x, y)
+            await self.location.place_object_on_map(game_obj=item, pos_x=x, pos_y=y)
         self.inventory = []
 
     def __check_is_player_dead(self) -> bool:

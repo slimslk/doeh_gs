@@ -1,15 +1,16 @@
-from game.item.item_messages import get_item_message
+from game.item.item_constants import GameObjectEnum
+from message.item_messages import get_item_message
 
 
 class DefaultObject:
     _DESTROY_ACTION = {"action": "destroy_me", "params": None}
 
-    def __init__(self):
-        self.interact_system = None
+    def __init__(self, interact_system):
+        self.interact_system = interact_system
         self.pos_x: int = 0
         self.pos_y: int = 0
         self.id: int = 0
-        self.name: str = "void"
+        self.name: str = GameObjectEnum.VOID.value
         self.__is_solid: bool = False
         self.__is_collectable: bool = False
         self.__is_consumable: bool = False
@@ -34,7 +35,7 @@ class DefaultObject:
         if self.hp > 0:
             self.hp -= amount
             if self.hp <= 0:
-                await self.interact_system.interact(self, None, self._DESTROY_ACTION)
+                await self.process_death()
 
     def get_id(self):
         return self.id
@@ -67,7 +68,10 @@ class DefaultObject:
         await self.interact_system.interact(actor, self, self.action)
 
     def get_message(self):
-        return get_item_message(self.name)
+        return get_item_message(self)
+
+    async def process_death(self):
+        await self.interact_system.interact(self, None, self._DESTROY_ACTION)
 
     def __str__(self):
         return f"{self.id}: {self.name} {self.action} {self.pos_x} {self.pos_y}"

@@ -4,8 +4,8 @@ from game.item.def_object import DefaultObject
 
 
 class DefaultConsumableObject(DefaultObject, ABC):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, interact_system):
+        super().__init__(interact_system)
         self.set_consumable(True)
 
     @abstractmethod

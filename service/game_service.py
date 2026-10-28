@@ -17,6 +17,7 @@ from config.settings import settings
 from repository.repository import CharacterRepository
 from utils.mapper import character_model_to_player
 from actions.actions import actionDTOMapConfig, GAME_ACTIONS, PLAYER_ACTIONS
+from main_constants import INTERATION_SYSTEM_CONTEXT_NAME
 
 
 class GameManager(ABC):
@@ -25,8 +26,8 @@ class GameManager(ABC):
     _game = None
     context: GameContext
 
-    def __init__(self):
-        self._context: GameContext | None = None
+    def __init__(self, context: GameContext):
+        self._context: GameContext = context
 
     @property
     def context(self) -> GameContext:
@@ -56,12 +57,13 @@ class KafkaGameManager(GameManager):
     _game_actions = GAME_ACTIONS
 
     def __init__(self,
+                 context: GameContext,
                  game: Main,
                  kafka_producer,
                  output_queue: DefaultBufferQueue,
                  char_repository: CharacterRepository,
                  ):
-        super().__init__()
+        super().__init__(context)
         self._game: Main = game
         self._kafka_producer = kafka_producer
         self._output_queue = output_queue
@@ -148,9 +150,10 @@ class KafkaGameManager(GameManager):
         except SQLAlchemyError as err:
             self.logger.error(f"Character {char_name} not found", exc_info=err)
             return None
-
-        player = character_model_to_player(char, self.context.interaction_system, self.context)
+        print("InSys ->", self.context.get_context(INTERATION_SYSTEM_CONTEXT_NAME))
+        player = character_model_to_player(char, self.context.get_context(INTERATION_SYSTEM_CONTEXT_NAME))
         player.is_active = True
+        print("Player InSys: ->", player.interact_system)
         return await self._game.return_character_to_game(player, char.stats.location_id)
 
     async def __create_player(self, params: tuple[str], user_id):
@@ -160,12 +163,12 @@ class KafkaGameManager(GameManager):
             character = await self._char_repository.create(player)
         except SQLAlchemyError as err:
             self.logger.error(f"Creating char: {player.name} of user: {user_id} is fail", exc_info=err)
-            await self._game.remove_player_from_location(player, player.world.map_id)
+            await self._game.remove_player_from_location(player, player.location.map_id)
             return None
         if not player:
             return
         player.id = character.id
-        await self._game.add_player_to_location(player, player.pos_x, player.pos_y, player.world.map_id)
+        await self._game.add_player_to_location(player, player.pos_x, player.pos_y, player.location.map_id)
         await self._game.create_player_controller(player)
         return player
 

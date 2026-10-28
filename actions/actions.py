@@ -65,5 +65,6 @@ GAME_ACTIONS = [
 
 OBJECT_ACTIONS = [
     "destroy_me",
-    "open_chest"
+    "open_chest",
+    "enter",
 ]
